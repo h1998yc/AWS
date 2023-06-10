@@ -1,0 +1,7 @@
+FROM ubuntu:20.04
+RUN apt-get update && apt-get -y install nginx tzdata
+COPY default /etc/nginx/sites-available/
+COPY main.html /var/www/html/
+ENV TZ=Asia/Seoul
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

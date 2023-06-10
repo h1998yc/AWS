@@ -37,7 +37,7 @@ iam:
 # Managed Node Groups
 managedNodeGroups:
   # On-Demand Instance
-  - name: mynodes-t3
+  - name: worker-node
     instanceType: t3.medium
     minSize: 2
     desiredCapacity: 2
