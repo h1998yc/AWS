@@ -1,0 +1,158 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: [EKS 네임 설정]				# (수정) 네이밍 규칙에 맞게 설정
+  region: ap-northeast-2
+  version: "1.26" # (수정) eksctl, helm 등의 버전을 고려하여 선택한다.
+
+# VPC를 생성한 후 k8s 클러스터 설정할 경우 VPC id 설정.
+vpc:
+  id: vpc-12345678  # 기존에 생성된 VPC의 ID
+
+availabilityZones: ["ap-northeast-2a", "ap-northeast-2c"]  # 사용할 가용 영역 지정
+
+# 파드들이 통신하기 위해 부여받는 네트워크 대역 설정, 기본적으로 사설 네트워크 대역을 사용한다.
+networking:
+  podSubnet: 192.168.0.0/16
+
+# 노드 그룹 관련 섹션. EC2 인스턴스에서 접속이 가능하기 때문에 ssh 접속 및 커스터 마이징을 위해서 managedNodeGroups: 보다 작업하기에 좀 더 적합하다, but 보안성은 떨어짐.
+nodeGroups:
+	# Front-end를 위한 Nginx 전용 노드 그룹, Private1 서브넷에 적용.
+  - name: worker-node-frontend
+    instanceType: t3.medium
+    desiredCapacity: 3
+    privateNetworking: true
+    subnets:
+      private:
+        - subnet-12345678  # (수정) 기존에 생성된 서브넷의 ID, private1
+        - subnet-23456789  # (수정) 기존에 생성된 서브넷의 ID, private1
+    networking:
+      podSubnet: 192.168.1.0/24			# Nginx 파드는 192.168.1.1~192.168.1.255 범위 내에서 ip 부여.
+
+	# 노드 그룹에 대한 오토 스케일링 적용
+    scalingConfig:
+      minSize: 2
+      maxSize: 5
+      desiredSize: 2
+      tags:
+        - key: "eksctl.io/cluster/my-cluster"	# (수정) 클러스터 이름에 맞게 설정.
+          value: "owned"
+          propagateToInstances: true
+	#ssh 관련 설정 및 ssh 키 페어 설정.
+    ssh:
+      allow: true
+      publicKeyPath: ~/.ssh/id_rsa.pub		# (수정) 키 페어 생성 후 경로 변경 필요.
+
+	# ubuntu20.04에 대한 ami를 자동으로 찾아서 적용시켜줌
+    amiFamily: Ubuntu 20.04	
+    ami: auto
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+        albIngress: true
+        cloudWatch: true
+        ebs: true
+	efs: true
+
+	# 노드 그룹 추옵션을 설정한다.
+  - name: worker-node-backend
+    instanceType: t3.large가하기 nodeGroups: 하위 부분에 다음과 같이 설정 추가 나머지는 다른 노드 그룹과 동일한 섹션에서 입맛에 맞게 
+    desiredCapacity: 3
+    privateNetworking: true
+    subnets:
+      private:
+        - subnet-34567890  # 기존에 생성된 서브넷의 ID, Private2
+        - subnet-45678901  # 기존에 생성된 서브넷의 ID, Private2
+    networking:
+      podSubnet: 192.168.2.0/24			# Tomcat 파드는 192.168.2.1 ~ 192.168.2.255 범위 내에서 ip 부여
+    scalingConfig:
+      minSize: 2
+      maxSize: 5
+      desiredSize: 2
+	# 노드 그룹의 EC2 인스턴스에 eksctl.io/cluster/my-cluster=owned라는 태그를 추가.
+	# 태그는 노드 그룹과 관련된 리소스를 식별하는 데 사용될 수 있습니다. 예를 들어, Auto Scaling 그룹에서 태그 기반의 정책을 설정하거나 클러스터 내에서 태그를 기반으로 작업을 수행할 수 있습니다.
+      tags:
+        - key: "eksctl.io/cluster/my-cluster"	# (수정) 클러스터 이름에 맞게 설정.
+          value: "owned"
+          propagateToInstances: true
+    ssh:
+      allow: true
+      publicKeyPath: ~/.ssh/id_rsa.pub		# (수정) 키 페어 생성 후 경로 변경 필요.
+    amiFamily: Ubuntu 20.04
+    ami: auto
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+        albIngress: true
+        cloudWatch: true
+        ebs: true
+	efs: true
+
+# IAM OIDC & Service Account 관련 섹션.
+iam:
+  withOIDC: true
+  serviceAccounts:
+    - metadata: 
+        name: aws-load-balancer-controller
+        namespace: kube-system
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+    - metadata: 
+        name: ebs-csi-controller-sa
+        namespace: kube-system
+      wellKnownPolicies:
+        ebsCSIController: true
+    - metadata: 
+        name: cluster-autoscaler
+        namespace: kube-system
+      wellKnownPolicies:
+        autoScaler: true
+    - metadata:
+        name: efs-csi-controller-sa
+        namespace: kube-system
+      wellKnownPolicies:
+        efsCSIController: true
+    - metadata: 
+        name: efs-csi-controller-sa
+        namespace: kube-system
+      wellKnownPolicies:
+        efsCSIController: true
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AWSAmazonElasticFileSystemFullAccess
+
+# Fargate Profiles
+fargateProfiles:
+  - name: myfg
+    selectors:
+    - namespace: dev
+      labels:
+        env: dev
+
+# CloudWatch Logging
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["*"] # 모든 로그를 클라우드워치에 남긴다
+
+
+# Managed Node Groups, EKS 관리형 노드 그룹 생성. SSH 접속 불가, 보안성은 좋다.
+managedNodeGroups:
+  # On-Demand Instance
+  - name: worker-node
+    instanceType: t3.medium
+    minSize: 2
+    desiredCapacity: 2
+    maxSize: 5
+    privateNetworking: true # 워커노드를 프라이빗 네트워크에 감춘다.
+    #ssh:
+      #allow: true
+      #publicKeyPath: ./keypair/myeks.pub
+    availabilityZones: ["ap-northeast-2a", "ap-northeast-2c"]
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+        albIngress: true
+        cloudWatch: true
+        ebs: true
+
+

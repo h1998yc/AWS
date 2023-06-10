@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: front-nginx-deploy
+  name: front-nginx-deploy
+  namespace: front-end
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: front-nginx-deploy
+  template:
+    metadata:
+      labels:
+        app: front-nginx-deploy
+    spec:
+      containers:
+      - image: public.ecr.aws/e6m3e0t8/h1998yc:nginx_v2.7
+        name: nginx

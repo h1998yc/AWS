@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: back-tomcat-deploy
+  name: back-tomcat-deploy
+  namespace: back-end
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: back-tomcat-deploy
+  template:
+    metadata:
+      labels:
+        app: back-tomcat-deploy
+    spec:
+      containers:
+      - image: public.ecr.aws/e6m3e0t8/h1998yc:tomcat_v2.7
+        name: tomcat

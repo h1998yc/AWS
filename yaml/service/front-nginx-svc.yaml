@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: front-nginx-deploy
+  name: front-nginx-svc
+  namespace: front-end
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: front-nginx-deploy
+  type: NodePort
